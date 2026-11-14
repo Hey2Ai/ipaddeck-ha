@@ -1,0 +1,24 @@
+name: iPadDeck Wohnzimmer
+version: "1.0.0"
+slug: ipaddeck_wall
+description: Kiosk-Dashboard fürs iPad im Wohnzimmer, direkt aus Home Assistant (ohne Mac, ohne Token).
+url: https://github.com/Hey2Ai/ipaddeck-ha
+arch:
+  - aarch64
+  - amd64
+init: false
+startup: application
+boot: auto
+homeassistant_api: true
+map:
+  - homeassistant_config:ro
+ports:
+  8099/tcp: 8099
+ports_description:
+  8099/tcp: iPad-Dashboard
+options:
+  code: ""
+  layout: ""
+schema:
+  code: str?
+  layout: str?

@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<!-- iPadDeck: Stream Deck + Home Assistant for an iPad mini 1 (iOS 9.3.5 Safari).
+     ES5 only: no let/const, arrow functions, template strings, fetch or Promises.
+     CSS: no grid, no gap, no variables, no env(); flexbox always with -webkit- prefix. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="iPadDeck">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>iPadDeck</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #050507; color: #f5f5f7;
+    font: 16px -apple-system, "Helvetica Neue", Helvetica, sans-serif; -webkit-font-smoothing: antialiased;
+    -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: rgba(0,0,0,0);
+    -webkit-text-size-adjust: 100%; }
+  #stage { position: absolute; left: 0; top: 0; width: 1024px; height: 768px; overflow: hidden;
+    -webkit-transform-origin: 0 0; transform-origin: 0 0;
+    background: radial-gradient(ellipse at 0% 0%, rgba(94,92,230,.22), rgba(0,0,0,0) 55%),
+                radial-gradient(ellipse at 100% 100%, rgba(217,119,87,.16), rgba(0,0,0,0) 55%), #050507; }
+  .row { display: -webkit-box; display: -webkit-flex; display: flex;
+    -webkit-box-align: center; -webkit-align-items: center; align-items: center; }
+  .grow { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; min-width: 0; }
+
+  /* status bar */
+  #status { position: absolute; left: 0; right: 0; top: 20px; height: 60px; padding: 0 28px; }
+  #time { font-size: 38px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
+  #date { margin-top: 4px; font-size: 12px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: #8e8e93; }
+  #seg { position: absolute; left: 50%; top: 10px; width: 300px; margin-left: -150px; height: 40px;
+    background: rgba(118,118,128,.26); border-radius: 10px; }
+  #seg div { float: left; width: 146px; height: 36px; margin: 2px 0 0 2px; line-height: 36px; text-align: center;
+    font-size: 16px; font-weight: 600; color: #c7c7cc; border-radius: 8px; }
+  #seg div.on { background: #636366; color: #fff; }
+  #conn { position: absolute; right: 28px; top: 20px; font-size: 13px; color: #8e8e93; }
+  #dot { display: inline-block; width: 8px; height: 8px; border-radius: 4px; background: #ff453a; margin-right: 6px; }
+  #dot.ok { background: #30d158; }
+
+  .view { position: absolute; left: 0; right: 0; top: 96px; bottom: 0; display: none; }
+  .view.on { display: block; }
+  .card { position: absolute; background: rgba(28,28,30,.82); border-radius: 20px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,.06); }
+  .label { font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #8e8e93; }
+
+  /* deck keys */
+  .key { position: absolute; width: 132px; text-align: center; }
+  .cap { width: 124px; height: 124px; margin: 0 auto; border-radius: 28px; background: #1c1c1e;
+    border: 1px solid rgba(255,255,255,.08); position: relative;
+    -webkit-transition: -webkit-transform .08s; transition: transform .08s; }
+  .cap img { position: absolute; left: 10px; top: 10px; width: 104px; height: 104px; }
+  .key.down .cap { -webkit-transform: scale(.94); transform: scale(.94); }
+  .klabel { margin-top: 10px; font-size: 14px; color: #d1d1d6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cap.note { background: -webkit-linear-gradient(top, #e8916e, #c4613e); background: linear-gradient(#e8916e, #c4613e); }
+  .cap .glyph { position: absolute; left: 0; right: 0; top: 30px; font-size: 52px; line-height: 64px; color: #fff; }
+  .cap.empty { background: transparent; border: 2px dashed rgba(255,255,255,.18); }
+  .cap.empty .glyph { color: #636366; }
+  #hint { position: absolute; font-size: 13px; color: #636366; text-align: center; }
+
+  /* now playing */
+  #np { padding: 18px; box-sizing: border-box; }
+  #art { width: 120px; height: 120px; border-radius: 12px; background: #2c2c2e; margin-right: 18px; position: relative; overflow: hidden; }
+  #art img { width: 120px; height: 120px; display: none; }
+  #art span { position: absolute; left: 0; right: 0; top: 36px; text-align: center; font-size: 40px; color: #48484a; }
+  #npTitle { font-size: 20px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #npArtist { margin-top: 4px; font-size: 15px; color: #aeaeb2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #bar { margin-top: 14px; height: 5px; border-radius: 3px; background: #3a3a3c; overflow: hidden; }
+  #barIn { height: 5px; width: 0; background: #f5f5f7; }
+  #times { margin-top: 6px; font-size: 12px; color: #8e8e93; }
+  #times span:last-child { float: right; }
+  #ctl { margin-top: 10px; -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between; }
+  .mb { width: 60px; height: 48px; line-height: 48px; text-align: center; font-size: 26px; border-radius: 12px; color: #fff; }
+  .mb.big { font-size: 32px; }
+  .mb.down { background: rgba(255,255,255,.12); }
+
+  /* widgets */
+  .wpad { padding: 16px 18px; }
+  #speed { margin-top: 8px; }
+  .num { font-size: 30px; font-weight: 700; letter-spacing: -.5px; }
+  .unit { font-size: 12px; color: #8e8e93; margin-left: 3px; }
+  .sub { font-size: 12px; color: #8e8e93; margin-top: 2px; }
+  #graph { display: block; margin-top: 10px; }
+  #netRun { float: right; color: #0a84ff; font-weight: 700; display: none; }
+  .bat { float: left; width: 50%; height: 40px; margin-top: 10px; }
+  .bat .ic { float: left; width: 34px; font-size: 22px; line-height: 40px; }
+  .bat .nm { font-size: 13px; color: #aeaeb2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 8px; }
+  .bat .pc { font-size: 18px; font-weight: 700; }
+  .bat .pc.low { color: #ff453a; }
+
+  /* home */
+  #scenes { position: absolute; left: 24px; right: 24px; top: 0; height: 64px; white-space: nowrap; overflow: hidden; }
+  .scene { display: inline-block; height: 52px; line-height: 52px; padding: 0 20px; margin-right: 10px; border-radius: 26px;
+    background: #2c2c2e; font-size: 16px; font-weight: 600; }
+  .scene.down, .scene.flash { background: #0a84ff; }
+  #rooms { position: absolute; left: 0; right: 0; top: 72px; bottom: 0; overflow-y: scroll; -webkit-overflow-scrolling: touch; padding: 0 12px 24px 24px; }
+  .room { float: left; width: 476px; margin: 0 12px 16px 0; background: rgba(28,28,30,.82); border-radius: 20px;
+    border: 1px solid rgba(255,255,255,.06); padding: 14px 6px 6px 14px; box-sizing: border-box; }
+  .room h2 { margin: 0 0 10px 2px; font-size: 18px; font-weight: 700; }
+  .tiles { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; }
+  .tile { width: 142px; height: 104px; margin: 0 8px 8px 0; border-radius: 16px; background: #2c2c2e; position: relative;
+    box-sizing: border-box; padding: 10px 12px; overflow: hidden; }
+  .tile .ti { font-size: 24px; line-height: 28px; }
+  .tile .tn { margin-top: 6px; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .ts { font-size: 13px; color: #8e8e93; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile.on { background: #f5f5f7; color: #1c1c1e; }
+  .tile.on .ts { color: #48484a; }
+  .tile.off .ti { opacity: .5; }
+  .tile.na { opacity: .35; }
+  .tile.down { -webkit-transform: scale(.95); transform: scale(.95); }
+  .tile.scn { background: #1f2a3a; }
+  .tile.scn.flash { background: #0a84ff; }
+  .tbtns { position: absolute; left: 6px; right: 6px; bottom: 6px; height: 36px; }
+  .tb { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; height: 36px; line-height: 36px; margin: 0 2px; text-align: center;
+    border-radius: 10px; background: rgba(255,255,255,.1); font-size: 17px; font-weight: 700; }
+  .tb.down { background: #0a84ff; }
+  .tile.cov .ts, .tile.clim .ts { position: absolute; right: 12px; top: 14px; font-size: 14px; }
+  .tile.clim .tn, .tile.cov .tn { margin-top: 0; position: absolute; left: 12px; top: 38px; right: 12px; font-size: 14px; }
+  #haMsg { position: absolute; left: 50%; top: 150px; width: 520px; margin-left: -260px; text-align: center; font-size: 17px;
+    color: #f5f5f7; display: none; line-height: 1.5; background: #3a3a3c; border-radius: 16px; padding: 18px 20px; box-sizing: border-box; z-index: 5; }
+
+  /* sheets */
+  .sheet { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: rgba(0,0,0,.6); display: none; z-index: 10; }
+  .sheet.on { display: block; }
+  .panel { position: absolute; left: 50%; top: 90px; width: 600px; margin-left: -300px; background: #1c1c1e; border-radius: 22px; padding: 22px; box-sizing: border-box; }
+  .panel h3 { margin: 0 0 14px; font-size: 20px; }
+  textarea, input { -webkit-appearance: none; border-radius: 12px; border: 0; background: #2c2c2e; color: #fff;
+    font: 18px -apple-system, "Helvetica Neue", sans-serif; -webkit-user-select: text; outline: none; box-sizing: border-box; width: 100%; }
+  textarea { height: 160px; padding: 12px; resize: none; }
+  input { height: 44px; padding: 0 12px; }
+  .btns { margin-top: 16px; text-align: right; }
+  .btn { display: inline-block; height: 46px; line-height: 46px; padding: 0 22px; margin-left: 10px; border-radius: 12px;
+    background: #3a3a3c; font-size: 17px; font-weight: 600; }
+  .btn.pri { background: #0a84ff; }
+  .btn.down { opacity: .6; }
+  #editList { margin-top: 12px; height: 380px; overflow-y: scroll; -webkit-overflow-scrolling: touch; }
+  .app { height: 52px; border-bottom: 1px solid #2c2c2e; }
+  .app img { width: 36px; height: 36px; margin: 0 12px 0 4px; }
+  .app .ord { width: 30px; height: 30px; line-height: 30px; border-radius: 15px; text-align: center; font-weight: 700;
+    background: #3a3a3c; color: #8e8e93; margin-right: 6px; font-size: 14px; }
+  .app.sel .ord { background: #0a84ff; color: #fff; }
+  #editCount { float: right; font-size: 14px; color: #8e8e93; font-weight: 400; margin-top: 4px; }
+  .bris { margin-top: 6px; }
+  .bri { float: left; width: 84px; height: 64px; line-height: 64px; margin: 0 8px 8px 0; text-align: center; border-radius: 14px;
+    background: #2c2c2e; font-size: 17px; font-weight: 700; }
+  .bri.down { background: #0a84ff; }
+  .clear { clear: both; }
+  /* living-room (wall) mode */
+  body.wall #seg, body.wall #deck { display: none; }
+  .room h2 .clim { float: right; margin-right: 10px; font-size: 14px; font-weight: 600; color: #8e8e93; }
+  .tile .tog { position: absolute; right: 8px; top: 8px; width: 40px; height: 40px; line-height: 40px; border-radius: 20px;
+    text-align: center; font-size: 18px; background: rgba(255,255,255,.12); }
+  .tile.on .tog { background: rgba(0,0,0,.12); }
+  .tile .tog.down { background: #0a84ff; }
+  .tile .more { position: absolute; right: 12px; bottom: 8px; font-size: 18px; color: #8e8e93; }
+  .tile.wl .tn { margin-top: 10px; }
+  #detSheet .panel { width: 640px; margin-left: -320px; top: 70px; }
+  #detTitle { float: left; }
+  #detClose { float: right; margin-top: -6px; }
+  .dhead { clear: both; padding-top: 6px; }
+  .dval { font-size: 46px; font-weight: 700; letter-spacing: -1px; }
+  .dsub { font-size: 15px; color: #aeaeb2; margin-top: 2px; min-height: 18px; }
+  .drow { margin-top: 18px; }
+  .dlab { font-size: 13px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: #8e8e93; }
+  .dlab span { float: right; color: #f5f5f7; letter-spacing: 0; text-transform: none; font-size: 15px; }
+  input[type=range] { -webkit-appearance: none; display: block; width: 100%; height: 48px; padding: 0; margin: 4px 0 0;
+    background: transparent; border-radius: 0; }
+  input[type=range]::-webkit-slider-runnable-track { height: 14px; border-radius: 7px; background: #3a3a3c; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 40px; height: 40px; border-radius: 20px;
+    background: #fff; margin-top: -13px; box-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  input.kel::-webkit-slider-runnable-track { background: -webkit-linear-gradient(left, #ffad5e, #fff6e8, #cfe0ff);
+    background: linear-gradient(to right, #ffad5e, #fff6e8, #cfe0ff); }
+  input.heat::-webkit-slider-runnable-track { background: -webkit-linear-gradient(left, #64a8ff, #ffd28a, #ff6b4a);
+    background: linear-gradient(to right, #64a8ff, #ffd28a, #ff6b4a); }
+  .opts { margin-top: 8px; }
+  .opt { display: inline-block; min-width: 96px; height: 52px; line-height: 52px; padding: 0 16px; margin: 0 8px 8px 0;
+    text-align: center; border-radius: 14px; background: #2c2c2e; font-size: 17px; font-weight: 600; box-sizing: border-box; }
+  .opt.sel { background: #0a84ff; }
+  .opt.down { opacity: .6; }
+  .opt.wide { min-width: 140px; }
+  /* wall panels */
+  #persons { position: absolute; left: 50%; top: 10px; width: 460px; margin-left: -230px; text-align: center; display: none; }
+  .pchip { display: inline-block; height: 36px; line-height: 36px; padding: 0 14px; margin: 0 4px; border-radius: 18px;
+    background: rgba(118,118,128,.26); font-size: 14px; font-weight: 600; color: #aeaeb2; }
+  .pchip.home { color: #fff; }
+  .pdot { display: inline-block; width: 8px; height: 8px; border-radius: 4px; background: #636366; margin-right: 8px; vertical-align: 1px; }
+  .pchip.home .pdot { background: #30d158; }
+  body.wall #conn { top: 14px; padding: 8px 12px; border-radius: 12px; font-size: 17px; color: #f5f5f7; background: rgba(118,118,128,.22); }
+  .alerts { margin: 0 10px 0 0; display: none; }
+  .alert { display: inline-block; padding: 10px 14px; margin: 0 8px 8px 0; border-radius: 12px; font-size: 15px; font-weight: 600;
+    background: #3a3a3c; }
+  .alert.warn { background: #4a3410; color: #ffd28a; }
+  .alert.ok { background: #123a24; color: #7dffaf; }
+  .alert.info { background: #1f2a3a; color: #9ecbff; }
+  .arow { position: relative; padding: 10px 0; border-top: 1px solid #2c2c2e; overflow: hidden; }
+  .arow:first-of-type { border-top: 0; }
+  .aic { float: left; width: 40px; font-size: 26px; line-height: 40px; }
+  .amid { margin-left: 48px; margin-right: 10px; }
+  .anm { font-size: 16px; font-weight: 700; }
+  .ast { font-size: 14px; color: #aeaeb2; margin-top: 2px; }
+  .arow.run .ast { color: #64a8ff; }
+  .arow.fin .ast { color: #30d158; font-weight: 700; }
+  .abar { height: 6px; margin-top: 8px; border-radius: 3px; background: #3a3a3c; overflow: hidden; display: none; }
+  .abarin { height: 6px; width: 0; background: #0a84ff; }
+  .tadd { margin: 0 10px 8px 0; }
+  .tadd input { height: 48px; margin-right: 8px; }
+  .tadd .btn { margin-left: 0; width: 48px; padding: 0; text-align: center; font-size: 26px; }
+  .tlist { max-height: 300px; overflow-y: scroll; -webkit-overflow-scrolling: touch; margin-right: 10px; }
+  .titem { height: 48px; border-bottom: 1px solid #2c2c2e; font-size: 17px; }
+  .tcheck { width: 26px; height: 26px; line-height: 24px; margin-right: 12px; border: 2px solid #636366; border-radius: 15px;
+    text-align: center; font-size: 15px; box-sizing: border-box; }
+  .titem.done { color: #636366; text-decoration: line-through; }
+  .titem.done .tcheck { background: #30d158; border-color: #30d158; color: #fff; }
+  .tmore { font-size: 15px; color: #0a84ff; padding: 10px 0 4px; }
+  .grow-row { overflow: hidden; margin-right: 10px; }
+  .gimg { float: left; width: 160px; height: 120px; margin-right: 14px; border-radius: 12px; background: #2c2c2e; object-fit: cover; }
+  .ginfo { overflow: hidden; }
+  .gst { font-size: 24px; font-weight: 700; }
+  .gstats { font-size: 15px; color: #aeaeb2; margin-top: 4px; line-height: 1.4; }
+  .gwarn { font-size: 15px; color: #ff9f0a; margin-top: 6px; font-weight: 600; }
+  .autorow { height: 52px; border-top: 1px solid #2c2c2e; font-size: 16px; margin-right: 10px; }
+  .autorow:first-of-type { border-top: 0; }
+  .sw { width: 52px; height: 32px; border-radius: 16px; background: #3a3a3c; position: relative; }
+  .sw .knob { position: absolute; left: 2px; top: 2px; width: 28px; height: 28px; border-radius: 14px; background: #fff;
+    -webkit-transition: left .15s; transition: left .15s; }
+  .sw.on { background: #30d158; }
+  .sw.on .knob { left: 22px; }
+  .fday { float: left; width: 16.66%; text-align: center; padding-top: 6px; }
+  .fdn { font-size: 15px; font-weight: 700; }
+  .fic { font-size: 34px; line-height: 52px; }
+  .fmax { font-size: 20px; font-weight: 700; }
+  .fmin { font-size: 15px; color: #8e8e93; }
+  .frain { font-size: 13px; color: #64a8ff; min-height: 16px; margin-top: 4px; }
+  #bigImg { position: absolute; left: 50%; top: 50%; max-width: 90%; max-height: 85%; border-radius: 16px;
+    -webkit-transform: translate(-50%, -50%); transform: translate(-50%, -50%); }
+  .col { float: left; }
+  /* today card */
+  #agNow { float: right; letter-spacing: 0; text-transform: none; font-weight: 600; color: #0a84ff; }
+  #agList { margin-top: 8px; }
+  .agrow { padding: 6px 8px 6px 10px; margin-bottom: 6px; border-left: 4px solid #0a84ff; border-radius: 0 8px 8px 0; }
+  .agrow.now { background: #1f2a3a; }
+  .agrow.cancel .agn { text-decoration: line-through; color: #8e8e93; }
+  .agt { font-size: 13px; color: #8e8e93; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .agn { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+  .agall { margin-bottom: 6px; white-space: nowrap; overflow: hidden; }
+  .agchip { display: inline-block; height: 24px; line-height: 24px; padding: 0 10px; margin-right: 6px; border-radius: 12px;
+    background: #2c2c2e; font-size: 13px; font-weight: 600; }
+  .agmore { font-size: 13px; color: #0a84ff; margin-top: 2px; }
+  .agmsg { font-size: 16px; color: #d1d1d6; margin-top: 8px; line-height: 1.4; }
+  .agnext { margin-top: 8px; font-size: 14px; }
+  /* lite mode for old iPads (iOS < 11): flat colours, no transitions or shadows */
+  body.lite #stage { background: #050507; }
+  body.lite .card, body.lite .room { background: #1c1c1e; border-color: #2c2c2e; }
+  body.lite .cap, body.lite .sw .knob { -webkit-transition: none; transition: none; }
+  body.lite .sheet { background: #000; }
+  body.lite #seg { background: #2c2c2e; }
+  body.lite .pchip, body.lite #conn { background: #2c2c2e; }
+  body.lite input[type=range]::-webkit-slider-thumb { box-shadow: none; }
+  #toast { position: absolute; left: 50%; top: 100px; width: 420px; margin-left: -210px; text-align: center; z-index: 20;
+    background: rgba(58,58,60,.95); border-radius: 14px; padding: 12px 16px; box-sizing: border-box; font-size: 16px; display: none; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="status">
+    <div><div id="time">--:--</div><div id="date"></div></div>
+    <div id="seg"><div id="segDeck" class="on">Deck</div><div id="segHome">Zuhause</div></div>
+    <div id="persons"></div>
+    <div id="conn"><span id="dot"></span><span id="mac">verbinde …</span></div>
+  </div>
+
+  <div id="deck" class="view on">
+    <div id="keys"></div>
+    <div id="hint">Taste halten = Apps wählen</div>
+    <div id="np" class="card"><div class="wpad">
+      <div class="label">Heute <span id="agNow"></span></div>
+      <div id="agList"><div class="sub agmsg">Lade Termine …</div></div>
+    </div></div>
+    <div id="net" class="card"><div class="wpad">
+      <div class="label">Internet <span id="netRun">misst …</span></div>
+      <div id="speed" class="row">
+        <div class="grow"><span class="num" id="sDown">–</span><span class="unit">Mbit/s</span><div class="sub">↓ Download</div></div>
+        <div class="grow"><span class="num" id="sUp">–</span><span class="unit">Mbit/s</span><div class="sub">↑ Upload</div></div>
+        <div class="grow"><span class="num" id="sPing">–</span><span class="unit">ms</span><div class="sub">Ping</div></div>
+      </div>
+      <canvas id="graph" width="320" height="60"></canvas>
+    </div></div>
+    <div id="bat" class="card"><div class="wpad">
+      <div class="label">Akkus</div>
+      <div id="batList"></div>
+    </div></div>
+  </div>
+
+  <div id="home" class="view">
+    <div id="scenes"></div>
+    <div id="rooms"></div>
+    <div id="haMsg"></div>
+  </div>
+
+  <div id="noteSheet" class="sheet"><div class="panel">
+    <h3>Notiz an Claude</h3>
+    <textarea id="noteText" placeholder="Tippen oder auf der Tastatur 🎤 drücken und sprechen …"></textarea>
+    <div class="btns"><div class="btn" id="noteCancel">Abbrechen</div><div class="btn pri" id="noteSend">An Claude senden</div></div>
+  </div></div>
+
+  <div id="editSheet" class="sheet"><div class="panel">
+    <h3>Apps wählen <span id="editCount"></span></h3>
+    <input id="filter" placeholder="Apps suchen" autocorrect="off" autocapitalize="none">
+    <div id="editList"></div>
+    <div class="btns"><div class="btn" id="editCancel">Abbrechen</div><div class="btn pri" id="editSave">Speichern</div></div>
+  </div></div>
+
+  <div id="briSheet" class="sheet"><div class="panel">
+    <h3 id="briTitle">Helligkeit</h3>
+    <div class="bris" id="bris"></div><div class="clear"></div>
+    <div class="btns"><div class="btn" id="briClose">Schließen</div></div>
+  </div></div>
+
+  <div id="detSheet" class="sheet"><div class="panel">
+    <h3 id="detTitle">Gerät</h3><div class="btn" id="detClose">Fertig</div>
+    <div id="detBody"></div>
+  </div></div>
+
+  <div id="fcSheet" class="sheet"><div class="panel">
+    <h3 id="fcTitle" style="float:left">Wetter</h3><div class="btn" id="fcClose" style="float:right;margin-top:-6px">Fertig</div>
+    <div class="clear"></div><div id="fcBody"></div>
+  </div></div>
+
+  <div id="imgSheet" class="sheet"><img id="bigImg" alt=""></div>
+
+  <div id="loginSheet" class="sheet"><div class="panel">
+    <h3>Zugangscode</h3>
+    <div class="sub" style="margin-bottom:12px;font-size:15px">Steht im Terminal des Macs bzw. in ~/.ipaddeck/token</div>
+    <input id="code" autocorrect="off" autocapitalize="none">
+    <div class="btns"><div class="btn pri" id="go">Verbinden</div></div>
+  </div></div>
+
+  <div id="toast"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var APP_SLOTS = 7;
+  var lite = !('isSecureContext' in window);   // iOS < 11.1: old, slow device
+  if (lite) document.body.className += ' lite';
+  // Only touch the DOM when something actually changed (each write costs a style pass on an A5).
+  function setT(e, v) { if (typeof e === 'string') e = $(e); if (e.textContent !== v) e.textContent = v; }
+  function setS(e, k, v) { if (typeof e === 'string') e = $(e); if (e.style[k] !== v) e.style[k] = v; }
+
+  // ---------- plumbing ----------
+  function store(k, v) {
+    try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; }
+    return null;
+  }
+  window.addEventListener('hashchange', function () { location.reload(); }, false);
+  var m = /k=([a-z0-9]+)/.exec(location.hash);
+  var token = m ? m[1] : store('token');
+  if (m) store('token', token);
+  function url(path, extra) { return path + '?k=' + token + (extra ? '&' + extra : ''); }
+  function enc(s) { return encodeURIComponent(s); }
+  function xhr(method, path, body, cb) {
+    var r = new XMLHttpRequest();
+    r.open(method, path, true);
+    r.timeout = 10000;
+    if (body !== null && body !== undefined) r.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    r.onload = function () { if (cb) cb(r.status, r.responseText); };
+    r.onerror = r.ontimeout = function () { if (cb) cb(0, ''); };
+    r.send(body === undefined ? null : body);
+  }
+  function parse(text) { try { return JSON.parse(text); } catch (e) { return null; } }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null) e.textContent = text;
+    return e;
+  }
+  function toast(msg) {
+    var t = $('toast'); t.textContent = msg; t.style.display = 'block';
+    clearTimeout(toast.t); toast.t = setTimeout(function () { t.style.display = 'none'; }, 2000);
+  }
+  function hasClass(e, c) { return (' ' + e.className + ' ').indexOf(' ' + c + ' ') >= 0; }
+  function addClass(e, c) { if (!hasClass(e, c)) e.className += ' ' + c; }
+  function removeClass(e, c) { e.className = (' ' + e.className + ' ').replace(' ' + c + ' ', ' ').replace(/^\s+|\s+$/g, ''); }
+  function flash(e) { addClass(e, 'flash'); setTimeout(function () { removeClass(e, 'flash'); }, 600); }
+
+  // Tap handler: instant on touch (no 300 ms delay), optional hold (550 ms), pressed state.
+  function tap(e, fn, hold) {
+    var moved, held, timer, touched = false;
+    e.addEventListener('touchstart', function (ev) {
+      ev.stopPropagation();
+      touched = true; moved = false; held = false; addClass(e, 'down');
+      if (hold) timer = setTimeout(function () { held = true; removeClass(e, 'down'); hold(ev); }, 550);
+    }, false);
+    e.addEventListener('touchmove', function () { moved = true; clearTimeout(timer); removeClass(e, 'down'); }, false);
+    e.addEventListener('touchend', function (ev) {
+      ev.preventDefault(); ev.stopPropagation(); clearTimeout(timer); removeClass(e, 'down');
+      if (!moved && !held) fn(ev);
+    }, false);
+    // Mouse (desktop testing): click = tap, long press via mousedown timer.
+    var mtimer, mheld;
+    e.addEventListener('mousedown', function (ev) {
+      ev.stopPropagation();
+      if (touched) return; mheld = false; addClass(e, 'down');
+      if (hold) mtimer = setTimeout(function () { mheld = true; removeClass(e, 'down'); hold(ev); }, 550);
+    }, false);
+    e.addEventListener('mouseup', function () { clearTimeout(mtimer); removeClass(e, 'down'); }, false);
+    e.addEventListener('click', function (ev) { ev.stopPropagation(); if (touched) return; if (!mheld) fn(ev); }, false);
+  }
+  function pos(e, x, y, w, h) {
+    e.style.left = x + 'px'; e.style.top = y + 'px';
+    if (w !== undefined) e.style.width = w + 'px';
+    if (h !== undefined) e.style.height = h + 'px';
+  }
+
+  // ---------- layout ----------
+  var W = 1024, H = 768, portrait = false;
+  function fit() {
+    var iw = window.innerWidth, ih = window.innerHeight;
+    portrait = ih > iw;
+    W = portrait ? 768 : 1024; H = portrait ? 1024 : 768;
+    var s = Math.min(iw / W, ih / H), st = $('stage');
+    st.style.width = W + 'px'; st.style.height = H + 'px';
+    st.style.webkitTransform = st.style.transform = Math.abs(s - 1) < 0.001 ? 'none' : 'scale(' + s + ')';
+    st.style.left = Math.round((iw - W * s) / 2) + 'px';
+    st.style.top = Math.round((ih - H * s) / 2) + 'px';
+    layout();
+  }
+  function layout() {
+    var keys = $('keys').childNodes, i, kx, ky, colW, rowH = 190;
+    if (!portrait) {
+      // Keys: 4×2 on the left. Widgets: one column on the right.
+      colW = 150;
+      kx = 24; ky = 150;
+      for (i = 0; i < keys.length; i++) pos(keys[i], kx + (i % 4) * colW, ky + Math.floor(i / 4) * rowH);
+      pos($('hint'), kx, ky + 2 * rowH + 10, 4 * colW);
+      pos($('np'), 640, 0, 360, 270);
+      pos($('net'), 640, 284, 360, 186);
+      pos($('bat'), 640, 484, 360, 168);
+      $('graph').width = 324;
+    } else {
+      colW = 180;
+      kx = 24; ky = 20;
+      for (i = 0; i < keys.length; i++) pos(keys[i], kx + 24 + (i % 4) * colW, ky + Math.floor(i / 4) * rowH);
+      pos($('hint'), 24, ky + 2 * rowH + 4, 720);
+      pos($('np'), 24, 420, 720, 250);
+      pos($('net'), 24, 684, 352, 200);
+      pos($('bat'), 392, 684, 352, 200);
+      $('graph').width = 316;
+    }
+    var roomW = portrait ? 352 : 476;
+    var rooms = document.querySelectorAll('.room');
+    for (i = 0; i < rooms.length; i++) rooms[i].style.width = roomW + 'px';
+    if (rooms.length) reflow();
+    drawGraph();
+  }
+  // Two-column "pinboard": each card goes into the currently shorter column, keeping the original order.
+  function reflow() {
+    var rooms = $('rooms');
+    var cards = Array.prototype.slice.call(rooms.querySelectorAll('.room'));
+    if (!cards.length) return;
+    cards.sort(function (a, b) { return a.idx - b.idx; });
+    var old = rooms.querySelectorAll('.col'), i;
+    var w = (portrait ? 352 : 476) + 12;
+    var a = el('div', 'col'), b = el('div', 'col');
+    a.style.width = b.style.width = w + 'px';
+    var anchor = rooms.querySelector('.clear');
+    rooms.insertBefore(a, anchor); rooms.insertBefore(b, anchor);
+    for (i = 0; i < cards.length; i++) (a.offsetHeight <= b.offsetHeight ? a : b).appendChild(cards[i]);
+    for (i = 0; i < old.length; i++) old[i].parentNode.removeChild(old[i]);
+  }
+  window.addEventListener('resize', fit, false);
+  window.addEventListener('orientationchange', function () { setTimeout(fit, 300); }, false);
+
+  // ---------- clock ----------
+  var DAYS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+  var MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+  function two(n) { return (n < 10 ? '0' : '') + n; }
+  function tick() {
+    var d = new Date();
+    $('time').textContent = two(d.getHours()) + ':' + two(d.getMinutes());
+    $('date').textContent = DAYS[d.getDay()] + ', ' + d.getDate() + '. ' + MONTHS[d.getMonth()];
+  }
+  setInterval(tick, 5000);
+
+  // ---------- views ----------
+  var wall = false;   // living-room iPad: Home Assistant only, full dashboard
+  var view = 'deck';
+  function show(v) {
+    if (wall) v = 'home';
+    view = v; store('view', v);
+    $('segDeck').className = v === 'deck' ? 'on' : '';
+    $('segHome').className = v === 'home' ? 'on' : '';
+    $('deck').className = 'view' + (v === 'deck' ? ' on' : '');
+    $('home').className = 'view' + (v === 'home' ? ' on' : '');
+    if (v === 'deck') pollStats(); else loadHome();
+  }
+  tap($('segDeck'), function () { show('deck'); });
+  tap($('segHome'), function () { show('home'); });
+  function sheet(id, on) { $(id).className = 'sheet' + (on ? ' on' : ''); }
+  function setConn(ok) { $('dot').className = ok ? 'ok' : ''; }
+
+  // ---------- deck: keys ----------
+  var launcher = { selected: null, all: [] };
+  function iconURL(path) { return url('/icon', 'path=' + enc(path)); }
+  function appName(path) {
+    for (var i = 0; i < launcher.all.length; i++) if (launcher.all[i].path === path) return launcher.all[i].name;
+    return path.replace(/^.*\//, '').replace(/\.app$/, '');
+  }
+  function loadKeys() {
+    xhr('GET', url('/launcher'), null, function (s, text) {
+      var d = s === 200 && parse(text);
+      if (!d) return;
+      launcher = d;
+      buildKeys();
+    });
+  }
+  function buildKeys() {
+    var box = $('keys'), sel = launcher.selected || [], i;
+    box.innerHTML = '';
+    for (i = 0; i < APP_SLOTS; i++) box.appendChild(appKey(sel[i]));
+    box.appendChild(noteKey());
+    layout();
+  }
+  function appKey(path) {
+    var k = el('div', 'key'), cap = el('div', 'cap');
+    k.appendChild(cap);
+    if (path) {
+      var img = el('img'); img.src = iconURL(path); cap.appendChild(img);
+      k.appendChild(el('div', 'klabel', appName(path)));
+      tap(k, function () {
+        xhr('POST', url('/launch'), 'path=' + enc(path), function (s) { if (s !== 200) toast('Konnte ' + appName(path) + ' nicht öffnen'); });
+      }, openEditor);
+    } else {
+      cap.className = 'cap empty'; cap.appendChild(el('div', 'glyph', '+'));
+      k.appendChild(el('div', 'klabel', 'Leer'));
+      tap(k, openEditor, openEditor);
+    }
+    return k;
+  }
+  function noteKey() {
+    var k = el('div', 'key'), cap = el('div', 'cap note');
+    cap.appendChild(el('div', 'glyph', '✎'));
+    k.appendChild(cap);
+    k.appendChild(el('div', 'klabel', 'Take note'));
+    tap(k, openNote, openEditor);
+    return k;
+  }
+
+  // ---------- take note ----------
+  function openNote() { $('noteText').value = ''; sheet('noteSheet', true); setTimeout(function () { $('noteText').focus(); }, 50); }
+  tap($('noteCancel'), function () { $('noteText').blur(); sheet('noteSheet', false); });
+  tap($('noteSend'), function () {
+    var t = $('noteText').value.replace(/^\s+|\s+$/g, '');
+    if (!t) { toast('Notiz ist leer'); return; }
+    $('noteText').blur();
+    xhr('POST', url('/claude'), 'send=1&text=' + enc(t), function (s) {
+      if (s === 200) { sheet('noteSheet', false); toast('An Claude geschickt'); } else toast('Senden fehlgeschlagen');
+    });
+  });
+
+  // ---------- app editor ----------
+  var picked = [];
+  function openEditor() {
+    picked = (launcher.selected || []).slice(0, APP_SLOTS);
+    $('filter').value = '';
+    renderEditor();
+    sheet('editSheet', true);
+  }
+  function renderEditor() {
+    var list = $('editList'), q = $('filter').value.toLowerCase(), i, a;
+    list.innerHTML = '';
+    $('editCount').textContent = picked.length + ' von ' + APP_SLOTS;
+    for (i = 0; i < launcher.all.length; i++) {
+      a = launcher.all[i];
+      if (q && a.name.toLowerCase().indexOf(q) < 0) continue;
+      list.appendChild(appRow(a));
+    }
+  }
+  function appRow(a) {
+    var idx = picked.indexOf(a.path);
+    var r = el('div', 'app row' + (idx >= 0 ? ' sel' : ''));
+    var img = el('img'); img.src = iconURL(a.path);
+    r.appendChild(img);
+    r.appendChild(el('div', 'grow', a.name));
+    r.appendChild(el('div', 'ord', idx >= 0 ? String(idx + 1) : ''));
+    tap(r, function () {
+      var j = picked.indexOf(a.path);
+      if (j >= 0) picked.splice(j, 1);
+      else if (picked.length < APP_SLOTS) picked.push(a.path);
+      else { toast('Maximal ' + APP_SLOTS + ' Apps'); return; }
+      renderEditor();
+    });
+    return r;
+  }
+  $('filter').addEventListener('input', renderEditor, false);
+  tap($('editCancel'), function () { $('filter').blur(); sheet('editSheet', false); });
+  tap($('editSave'), function () {
+    $('filter').blur();
+    xhr('POST', url('/launcher'), 'paths=' + enc(picked.join('\n')), function (s) {
+      if (s !== 200) { toast('Speichern fehlgeschlagen'); return; }
+      sheet('editSheet', false); loadKeys();
+    });
+  });
+
+  // ---------- now playing ----------
+  var np = null, npAt = 0, artId = '';
+  function mmss(sec) { sec = Math.max(0, Math.floor(sec || 0)); return Math.floor(sec / 60) + ':' + two(sec % 60); }
+  function renderMusic(mu) {
+    np = mu && mu.title ? mu : null; npAt = new Date().getTime();
+    if (!np) {
+      setT('npApp', 'Musik'); setT('npTitle', 'Nichts läuft'); setT('npArtist', ' ');
+      setT('mPlay', '▶︎'); setS('artImg', 'display', 'none'); artId = '';
+      tickProgress(); return;
+    }
+    setT('npApp', np.app === 'Music' ? 'Apple Music' : np.app);
+    setT('npTitle', np.title);
+    setT('npArtist', np.artist || ' ');
+    setT('mPlay', np.playing ? '❚❚' : '▶︎');
+    var key = np.id + (np.hasArt ? '1' : '0');
+    if (key !== artId) {
+      artId = key;
+      if (np.hasArt) { $('artImg').src = url('/artwork', 'id=' + enc(np.id)); $('artImg').style.display = 'block'; }
+      else $('artImg').style.display = 'none';
+    }
+    tickProgress();
+  }
+  function tickProgress() {
+    if (!np || !np.duration) { setS('barIn', 'width', '0px'); setT('tPos', '0:00'); setT('tDur', '0:00'); return; }
+    var p = np.position + (np.playing ? (new Date().getTime() - npAt) / 1000 : 0);
+    p = Math.min(p, np.duration);
+    setS('barIn', 'width', (Math.round(p / np.duration * 1000) / 10) + '%');
+    setT('tPos', mmss(p)); setT('tDur', mmss(np.duration));
+  }
+
+  function media(cmd) { xhr('POST', url('/media'), 'cmd=' + cmd, function () { setTimeout(pollStats, 450); }); }
+
+  // ---------- today's appointments (macOS calendar) ----------
+  var agKey = '', WD = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  function inMin(ms) {
+    var m = Math.round(ms / 60000);
+    if (m < 60) return m + ' Min';
+    var h = Math.floor(m / 60), r = m % 60;
+    return h + ' h' + (r ? ' ' + r + ' Min' : '');
+  }
+  function renderAgenda(ag) {
+    var now = new Date().getTime();
+    var key = JSON.stringify(ag || null) + Math.floor(now / 60000);
+    if (key === agKey) return;
+    agKey = key;
+    var list = $('agList'), i, e, row, max = portrait ? 3 : 4, shown = 0, rest = 0, allDay = [], timed = [];
+    list.innerHTML = '';
+    if (!ag || ag.access === 'pending') { setT('agNow', ''); list.appendChild(el('div', 'sub agmsg', 'Bitte am Mac den Kalender-Zugriff für iPadDeck erlauben.')); return; }
+    if (ag.access === 'denied') {
+      setT('agNow', '');
+      list.appendChild(el('div', 'sub agmsg', 'Kein Kalender-Zugriff. Am Mac: Systemeinstellungen → Datenschutz & Sicherheit → Kalender → iPadDeck erlauben.'));
+      return;
+    }
+    for (i = 0; i < (ag.events || []).length; i++) {
+      e = ag.events[i];
+      if (e.allDay) allDay.push(e); else if (e.end > now) timed.push(e);
+    }
+    // header: running or next appointment
+    var cur = null, nxt = null;
+    for (i = 0; i < timed.length; i++) {
+      if (timed[i].start <= now && !cur) cur = timed[i];
+      else if (timed[i].start > now && !nxt) nxt = timed[i];
+    }
+    setT('agNow', cur ? 'läuft bis ' + hhmm(new Date(cur.end)) : nxt ? 'nächster in ' + inMin(nxt.start - now) : '');
+    if (allDay.length) {
+      var chips = el('div', 'agall');
+      for (i = 0; i < allDay.length && i < 3; i++) chips.appendChild(el('span', 'agchip', allDay[i].title));
+      list.appendChild(chips);
+      max--;
+    }
+    for (i = 0; i < timed.length; i++) {
+      e = timed[i];
+      if (shown >= max) { rest++; continue; }
+      row = el('div', 'agrow' + (e.start <= now ? ' now' : '') + (e.canceled ? ' cancel' : ''));
+      row.style.borderLeftColor = e.color || '#0a84ff';
+      row.appendChild(el('div', 'agt', hhmm(new Date(e.start)) + '–' + hhmm(new Date(e.end)) + (e.location ? ' · ' + e.location : '')));
+      row.appendChild(el('div', 'agn', e.title));
+      list.appendChild(row);
+      shown++;
+    }
+    if (rest) list.appendChild(el('div', 'agmore', '+ ' + rest + ' weitere heute'));
+    if (!timed.length) {
+      list.appendChild(el('div', 'agmsg', allDay.length ? 'Keine weiteren Termine heute.' : 'Heute keine Termine mehr. 🎉'));
+      if (ag.next) {
+        var nd = new Date(ag.next.start);
+        list.appendChild(el('div', 'sub agnext', 'Nächster: ' + WD[nd.getDay()] + ' ' + nd.getDate() + '.' + (nd.getMonth() + 1) + '. ' + hhmm(nd) + ' · ' + ag.next.title));
+      }
+    }
+  }
+
+  // ---------- internet ----------
+  var history = [], graphKey = '';
+  function fmt(n) { return n >= 100 ? String(Math.round(n)) : (Math.round(n * 10) / 10).toString().replace('.', ','); }
+  function renderNet(net, sp) {
+    history = (net && net.history) || [];
+    setT('sDown', sp && sp.down !== undefined ? fmt(sp.down) : '–');
+    setT('sUp', sp && sp.up !== undefined ? fmt(sp.up) : '–');
+    setT('sPing', sp && sp.ping !== undefined ? String(Math.round(sp.ping)) : '–');
+    setS('netRun', 'display', sp && sp.running ? 'inline' : 'none');
+    var gk = history.length + ':' + history.slice(-3).join(',');
+    if (gk !== graphKey) { graphKey = gk; drawGraph(); }
+  }
+  function drawGraph() {
+    var c = $('graph'), ctx = c.getContext && c.getContext('2d');
+    if (!ctx) return;
+    var w = c.width, h = c.height, i, max = 1;
+    ctx.clearRect(0, 0, w, h);
+    for (i = 0; i < history.length; i++) if (history[i] > max) max = history[i];
+    if (history.length < 2) return;
+    ctx.beginPath();
+    for (i = 0; i < history.length; i++) {
+      var x = i / (history.length - 1) * w, y = h - 2 - history[i] / max * (h - 6);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+    ctx.fillStyle = 'rgba(10,132,255,.25)'; ctx.fill();
+    ctx.beginPath();
+    for (i = 0; i < history.length; i++) {
+      var x2 = i / (history.length - 1) * w, y2 = h - 2 - history[i] / max * (h - 6);
+      if (i === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
+    }
+    ctx.strokeStyle = '#0a84ff'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#8e8e93'; ctx.font = '11px -apple-system, Helvetica'; ctx.fillText(fmt(max) + ' Mbit/s', 2, 11);
+  }
+  tap($('net'), function () { xhr('POST', url('/speedtest'), '', function () { toast('Speedtest läuft …'); setTimeout(pollStats, 500); }); });
+
+  // ---------- batteries ----------
+  var batKey = '';
+  var KIND = { laptop: '💻', keyboard: '⌨️', mouse: '🖱', trackpad: '▭', headphones: '🎧' };
+  function renderBat(list) {
+    var box = $('batList'), i, b, row, txt, key = JSON.stringify(list || []);
+    if (key === batKey) return;
+    batKey = key;
+    box.innerHTML = '';
+    if (!list || !list.length) { box.appendChild(el('div', 'sub', 'Keine Geräte gefunden')); return; }
+    for (i = 0; i < list.length && i < 6; i++) {
+      b = list[i];
+      row = el('div', 'bat');
+      row.appendChild(el('div', 'ic', KIND[b.kind] || '🔋'));
+      txt = el('div');
+      txt.appendChild(el('div', 'nm', b.name));
+      txt.appendChild(el('span', 'pc' + (b.level <= 20 ? ' low' : ''), b.level + '%' + (b.charging ? ' ⚡︎' : '')));
+      if (b['case'] !== undefined) txt.appendChild(el('span', 'unit', 'Case ' + b['case'] + '%'));
+      row.appendChild(txt);
+      box.appendChild(row);
+    }
+  }
+
+  // ---------- stats polling (deck only) ----------
+  var statsBusy = false;
+  function pollStats() {
+    if (view !== 'deck' || statsBusy || !token) return;
+    statsBusy = true;
+    xhr('GET', url('/stats'), null, function (s, text) {
+      statsBusy = false;
+      var d = s === 200 && parse(text);
+      setConn(!!d);
+      if (!d) return;
+      if (d.mac) $('mac').textContent = d.mac;
+      renderAgenda(d.agenda); renderNet(d.net, d.speed); renderBat(d.batteries);
+    });
+  }
+  setInterval(pollStats, lite ? 3000 : 2000);
+
+  // ---------- home assistant ----------
+  var homeCfg = null, tiles = {}, haBusy = false, haStates = {}, roomHeads = [];
+  var ICON = { light: '💡', cover: '🪟', climate: '🌡', fan: '🌀', 'switch': '🔌', input_boolean: '🔘', scene: '✨', script: '▶︎' };
+  function domainOf(id) { return id.split('.')[0]; }
+  function haCall(entity, action, value, cb) {
+    var body = 'entity=' + enc(entity) + '&action=' + enc(action) + (value !== undefined ? '&value=' + enc(value) : '');
+    if (tiles[entity]) tiles[entity].sig = '';
+    xhr('POST', url('/ha/call'), body, function (s, text) {
+      var d = parse(text) || {};
+      if (s !== 200) toast(haError(d.error));
+      if (cb) cb(s === 200);
+      setTimeout(pollHome, 600);
+    });
+  }
+  function haError(code) {
+    if (code === 'no_token') return 'Home-Assistant-Token fehlt (~/.ipaddeck/ha.json auf dem Mac)';
+    if (code === 'auth') return 'Home Assistant lehnt den Token ab';
+    if (code === 'not_allowed') return 'Gerät ist nicht freigegeben';
+    if (code === 'favorite_missing') return 'Playlist ist in Sonos noch nicht als Favorit gespeichert';
+    if (code === 'no_favorites') return 'Sonos-Favoriten nicht verfügbar';
+    return 'Home Assistant nicht erreichbar';
+  }
+  function loadHome() {
+    if (homeCfg) { pollHome(); return; }
+    xhr('GET', url('/ha/config'), null, function (s, text) {
+      var d = s === 200 && parse(text);
+      if (!d) return;
+      homeCfg = d; buildHome(); pollHome();
+    });
+  }
+  function buildHome() {
+    var sc = $('scenes'), rooms = $('rooms'), i, j, r, box, grid, h;
+    sc.innerHTML = ''; rooms.innerHTML = ''; tiles = {}; roomHeads = []; cardSeq = 0;
+    var scenes = homeCfg.scenes || [];
+    for (i = 0; i < scenes.length; i++) sc.appendChild(sceneChip(scenes[i]));
+    var list = homeCfg.rooms || [];
+    buildPanelsTop(rooms);
+    for (i = 0; i < list.length; i++) {
+      r = list[i];
+      box = el('div', 'room'); box.idx = cardSeq++;
+      h = el('h2', null, r.name);
+      if (r.temp || r.humidity || r.valve || r.motion) {
+        var clim = el('span', 'clim', '');
+        h.appendChild(clim);
+        roomHeads.push({ temp: r.temp, hum: r.humidity, valve: r.valve, motion: r.motion, el: clim });
+      }
+      box.appendChild(h);
+      grid = el('div', 'tiles');
+      for (j = 0; j < (r.tiles || []).length; j++) grid.appendChild(makeTile(r.tiles[j]));
+      box.appendChild(grid);
+      rooms.appendChild(box);
+    }
+    buildPanelsBottom(rooms);
+    rooms.appendChild(el('div', 'clear'));
+    if (!list.length) showHaMsg('Keine Räume konfiguriert (~/.ipaddeck/home.json)');
+    layout();
+  }
+  function sceneChip(s) {
+    var c = el('div', 'scene', (s.icon ? s.icon + '  ' : '') + s.name);
+    tap(c, function () {
+      flash(c);
+      var d = domainOf(s.entity);
+      haCall(s.entity, s.action || (d === 'scene' || d === 'script' ? 'activate' : 'toggle'));
+    });
+    return c;
+  }
+  function makeTile(cfg) {
+    var id = cfg.entity, d = domainOf(id), t = el('div', 'tile'), btns;
+    var ref = { cfg: cfg, el: t, dom: d };
+    t.appendChild(el('div', 'ti', cfg.icon || ICON[d] || '•'));
+    ref.name = el('div', 'tn', cfg.name || id);
+    ref.st = el('div', 'ts', '');
+    t.appendChild(ref.name); t.appendChild(ref.st);
+    if (d === 'scene' || d === 'script') {
+      t.className = 'tile scn';
+      tap(t, function () { flash(t); haCall(id, 'activate'); });
+    } else if (d === 'cover') {
+      t.className = 'tile cov';
+      btns = el('div', 'tbtns row');
+      btns.appendChild(btn('▲', function () { haCall(id, 'open'); }));
+      btns.appendChild(btn('■', function () { haCall(id, 'stop'); }));
+      btns.appendChild(btn('▼', function () { haCall(id, 'close'); }));
+      t.appendChild(btns);
+    } else if (d === 'climate') {
+      t.className = 'tile clim';
+      btns = el('div', 'tbtns row');
+      btns.appendChild(btn('−', function () { bumpTemp(ref, -0.5); }));
+      ref.tgt = el('div', 'tb', '–'); ref.tgt.style.background = 'transparent';
+      btns.appendChild(ref.tgt);
+      btns.appendChild(btn('+', function () { bumpTemp(ref, 0.5); }));
+      t.appendChild(btns);
+    } else if (!wall) {
+      tap(t, function () {
+        var cur = haStates[id];
+        if (cur) { cur.state = cur.state === 'on' ? 'off' : 'on'; renderTile(ref); }
+        haCall(id, 'toggle');
+      }, d === 'light' ? function () { openBri(ref); } : null);
+    }
+    if (wall && d !== 'scene' && d !== 'script') {
+      // Wall: the round button toggles, the rest of the tile opens the detail view with sliders.
+      addClass(t, 'wl');
+      if (d === 'light' || d === 'fan' || d === 'switch' || d === 'input_boolean' || d === 'media_player') {
+        var tog = el('div', 'tog', '⏻');
+        tap(tog, function () { quickToggle(ref); });
+        t.appendChild(tog);
+      }
+      if (d !== 'switch' && d !== 'input_boolean') {
+        if (d !== 'cover' && d !== 'climate') t.appendChild(el('div', 'more', '›'));
+        tap(t, function () { openDetail(ref); });
+      } else tap(t, function () { quickToggle(ref); });
+    }
+    tiles[id] = ref;
+    return t;
+  }
+  function btn(label, fn) { var b = el('div', 'tb', label); tap(b, fn); return b; }
+  function bumpTemp(ref, delta) {
+    var s = haStates[ref.cfg.entity];
+    if (!s || s.target === undefined) { toast('Keine Solltemperatur'); return; }
+    s.target = Math.max(5, Math.min(30, Math.round((s.target + delta) * 2) / 2));
+    renderTile(ref);
+    clearTimeout(ref.tmr);
+    ref.pending = true;
+    ref.tmr = setTimeout(function () { ref.pending = false; haCall(ref.cfg.entity, 'temp', String(s.target)); }, 900);
+  }
+  function deg(n) { return (Math.round(n * 10) / 10).toString().replace('.', ',') + '°'; }
+  function renderTile(ref) {
+    var s = haStates[ref.cfg.entity], d = ref.dom, t = ref.el;
+    if (!s || s.state === 'unavailable' || s.state === 'unknown' && d !== 'scene' && d !== 'script') {
+      if (d !== 'scene' && d !== 'script') { t.className = 'tile na' + (d === 'cover' ? ' cov' : d === 'climate' ? ' clim' : ''); ref.st.textContent = 'nicht erreichbar'; }
+      return;
+    }
+    if (d === 'light' || d === 'switch' || d === 'fan' || d === 'input_boolean') {
+      var on = s.state === 'on';
+      t.className = 'tile ' + (on ? 'on' : 'off');
+      ref.st.textContent = on ? (s.bri !== undefined ? s.bri + ' %' : 'An') : 'Aus';
+    } else if (d === 'media_player') {
+      var mon = s.state !== 'off' && s.state !== 'standby';
+      t.className = 'tile ' + (mon ? 'on' : 'off');
+      ref.st.textContent = s.state === 'playing' ? (s.title || 'Spielt') : s.state === 'paused' ? 'Pausiert' :
+        mon ? 'Bereit' + (s.vol !== undefined ? ' · ' + s.vol + ' %' : '') : 'Aus';
+    } else if (d === 'cover') {
+      t.className = 'tile cov';
+      var CS = { open: 'Offen', closed: 'Zu', opening: 'Öffnet …', closing: 'Schließt …' };
+      ref.st.textContent = s.pos !== undefined && s.state !== 'closed' && s.pos < 100 ? s.pos + ' %' : (CS[s.state] || s.state);
+    } else if (d === 'climate') {
+      t.className = 'tile clim' + (s.state === 'off' ? ' off' : '');
+      ref.st.textContent = s.cur !== undefined ? deg(s.cur) : '';
+      ref.tgt.textContent = s.state === 'off' ? 'Aus' : (s.target !== undefined ? deg(s.target) : '–');
+    }
+  }
+  function wallClass(ref) { if (wall && ref.dom !== 'scene' && ref.dom !== 'script') addClass(ref.el, 'wl'); }
+  function pollHome() {
+    if (view !== 'home' || haBusy || !homeCfg || !token) return;
+    haBusy = true;
+    xhr('GET', url('/ha/states'), null, function (s, text) {
+      haBusy = false;
+      var d = s === 200 && parse(text);
+      setConn(s === 200);
+      if (!d) return;
+      if (d.error) { showHaMsg(haError(d.error)); return; }
+      showHaMsg('');
+      var id;
+      for (id in tiles) {
+        if (!tiles.hasOwnProperty(id)) continue;
+        if (tiles[id].pending) continue;
+        haStates[id] = d.states[id];
+        var sig = JSON.stringify(d.states[id] || null);
+        if (sig === tiles[id].sig) continue;
+        tiles[id].sig = sig;
+        renderTile(tiles[id]); wallClass(tiles[id]);
+      }
+      for (id in d.states) if (d.states.hasOwnProperty(id) && !tiles[id]) haStates[id] = d.states[id];
+      serverAlerts = d.alerts || null;
+      renderHeads(); updateDetail(); renderPanels();
+    });
+  }
+  function showHaMsg(msg) {
+    $('haMsg').textContent = msg;
+    $('haMsg').style.display = msg ? 'block' : 'none';
+    $('rooms').style.opacity = msg ? '.25' : '1';
+  }
+  setInterval(pollHome, 3000);
+
+  function quickToggle(ref) {
+    var cur = haStates[ref.cfg.entity];
+    if (cur && ref.dom !== 'media_player') { cur.state = cur.state === 'on' ? 'off' : 'on'; renderTile(ref); wallClass(ref); }
+    haCall(ref.cfg.entity, 'toggle');
+  }
+  function numState(id) {
+    var s = haStates[id];
+    if (!s) return null;
+    if (id.indexOf('climate.') === 0) return s.cur !== undefined ? s.cur : null;
+    var n = parseFloat(s.state);
+    return isNaN(n) ? null : n;
+  }
+  var WX = { sunny: '☀️', 'clear-night': '🌙', partlycloudy: '⛅', cloudy: '☁️', rainy: '🌧', pouring: '🌧', snowy: '❄️',
+    'snowy-rainy': '🌨', fog: '🌫', hail: '🌨', lightning: '⚡', 'lightning-rainy': '⛈', windy: '💨', 'windy-variant': '💨' };
+  function renderHeads() {
+    var i, h, t, hu, parts;
+    for (i = 0; i < roomHeads.length; i++) {
+      h = roomHeads[i]; parts = [];
+      t = h.temp ? numState(h.temp) : null;
+      hu = h.hum ? numState(h.hum) : null;
+      if (t !== null) parts.push(deg(t));
+      if (hu !== null) parts.push(Math.round(hu) + ' %');
+      if (h.valve && stateOf(h.valve) === 'on') parts.unshift('🔥 heizt');
+      if (h.motion) {
+        for (var mi = 0; mi < h.motion.length; mi++) if (stateOf(h.motion[mi]) === 'on') { parts.unshift('● Bewegung'); break; }
+      }
+      h.el.textContent = parts.join(' · ');
+    }
+    if (wall && homeCfg && homeCfg.weather) {
+      var w = haStates[homeCfg.weather];
+      if (w) $('mac').textContent = (WX[w.state] || '') + ' ' + (w.target !== undefined ? deg(w.target) : '') + ' draußen';
+    }
+  }
+
+  // ---------- detail view (wall) ----------
+  var det = null;
+  var MODE = { heat: 'Heizen', cool: 'Kühlen', off: 'Aus', auto: 'Auto', heat_cool: 'Auto' };
+  var PRESET = { auto: 'Auto', night: 'Nacht', sleep: 'Schlaf', eco: 'Eco', boost: 'Boost' };
+  function openDetail(ref) {
+    det = { ref: ref, c: {}, drag: false };
+    $('detTitle').textContent = ref.cfg.name;
+    buildDetail();
+    sheet('detSheet', true);
+    updateDetail();
+  }
+  function closeDetail() { det = null; sheet('detSheet', false); }
+  tap($('detClose'), closeDetail);
+  function dRow(parent, label) {
+    var r = el('div', 'drow'), l = el('div', 'dlab', label), v = el('span', null, '');
+    l.appendChild(v); r.appendChild(l); parent.appendChild(r);
+    return { row: r, val: v };
+  }
+  function dSlider(parent, label, min, max, step, fmtFn, send, cls) {
+    var r = dRow(parent, label), inp = document.createElement('input');
+    inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step;
+    if (cls) inp.className = cls;
+    r.row.appendChild(inp);
+    var o = { input: inp, val: r.val, fmt: fmtFn };
+    function grab(e) { if (e) e.stopPropagation(); if (det) det.drag = true; }
+    inp.addEventListener('touchstart', grab, false);
+    inp.addEventListener('mousedown', grab, false);
+    inp.addEventListener('input', function () { r.val.textContent = fmtFn(+inp.value); }, false);
+    inp.addEventListener('change', function () {
+      r.val.textContent = fmtFn(+inp.value); send(+inp.value);
+      setTimeout(function () { if (det) det.drag = false; }, 1500);
+    }, false);
+    return o;
+  }
+  function dOpts(parent, items, onPick, wide) {
+    var box = el('div', 'opts'), list = [], i;
+    for (i = 0; i < items.length; i++) {
+      (function (it) {
+        var b = el('div', 'opt' + (wide ? ' wide' : ''), it.label);
+        b.setAttribute('data-v', it.value);
+        tap(b, function () { onPick(it.value, b); });
+        box.appendChild(b); list.push(b);
+      })(items[i]);
+    }
+    parent.appendChild(box);
+    return list;
+  }
+  function selOpts(list, value) {
+    if (!list) return;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].getAttribute('data-v') === value) addClass(list[i], 'sel'); else removeClass(list[i], 'sel');
+    }
+  }
+  function buildDetail() {
+    var ref = det.ref, id = ref.cfg.entity, d = ref.dom, s = haStates[id] || {}, body = $('detBody'), c = det.c;
+    body.innerHTML = '';
+    var head = el('div', 'dhead');
+    c.big = el('div', 'dval', ''); c.sub = el('div', 'dsub', '');
+    head.appendChild(c.big); head.appendChild(c.sub); body.appendChild(head);
+    function setLocal(k, v) { if (haStates[id]) haStates[id][k] = v; }
+    if (d === 'light') {
+      c.power = dOpts(body, [{ label: 'An', value: 'on' }, { label: 'Aus', value: 'off' }], function (v) {
+        setLocal('state', v); haCall(id, v); updateDetail(); }, true);
+      if (s.dim !== false) c.bri = dSlider(body, 'Helligkeit', 1, 100, 1, function (v) { return v + ' %'; }, function (v) {
+        setLocal('bri', v); setLocal('state', 'on'); haCall(id, 'brightness', String(v)); });
+      if (s.ct) c.kel = dSlider(body, 'Farbtemperatur', s.kmin || 2000, s.kmax || 6500, 50, function (v) {
+        return (v < 3300 ? 'Warm' : v > 5000 ? 'Kalt' : 'Neutral') + ' · ' + v + ' K'; }, function (v) {
+        setLocal('kelvin', v); setLocal('state', 'on'); haCall(id, 'kelvin', String(v)); }, 'kel');
+    } else if (d === 'cover') {
+      dOpts(body, [{ label: '▲  Öffnen', value: 'open' }, { label: '■  Stopp', value: 'stop' }, { label: '▼  Schließen', value: 'close' }],
+        function (v) { haCall(id, v); }, true);
+      if (s.sf === undefined || (s.sf & 4)) c.pos = dSlider(body, 'Position', 0, 100, 1, function (v) {
+        return v === 0 ? 'Zu' : v === 100 ? 'Offen' : v + ' % offen'; }, function (v) { setLocal('pos', v); haCall(id, 'position', String(v)); });
+    } else if (d === 'climate') {
+      c.tgt = dSlider(body, 'Solltemperatur', s.tmin || 5, s.tmax || 30, s.tstep || 0.5, function (v) { return deg(v); }, function (v) {
+        setLocal('target', v); renderTile(ref); wallClass(ref); haCall(id, 'temp', String(v)); updateDetail(); }, 'heat');
+      dOpts(body, [{ label: '−  0,5°', value: '-' }, { label: '+  0,5°', value: '+' }], function (v) {
+        bumpTemp(ref, v === '+' ? 0.5 : -0.5); det.drag = false; updateDetail(); }, true);
+      var mrow = dRow(body, 'Modus'), modes = s.modes || ['heat', 'off'], items = [], i;
+      for (i = 0; i < modes.length; i++) items.push({ label: MODE[modes[i]] || modes[i], value: modes[i] });
+      c.modes = dOpts(mrow.row, items, function (v) { setLocal('state', v); haCall(id, 'mode', v); updateDetail(); });
+    } else if (d === 'fan') {
+      c.power = dOpts(body, [{ label: 'An', value: 'on' }, { label: 'Aus', value: 'off' }], function (v) {
+        setLocal('state', v); haCall(id, v); updateDetail(); }, true);
+      c.pct = dSlider(body, 'Stufe', 1, 100, 1, function (v) { return v + ' %'; }, function (v) {
+        setLocal('pct', v); setLocal('state', 'on'); haCall(id, 'percentage', String(v)); });
+      if (s.presets && s.presets.length) {
+        var prow = dRow(body, 'Modus'), pitems = [], j;
+        for (j = 0; j < s.presets.length; j++) if (PRESET[s.presets[j]]) pitems.push({ label: PRESET[s.presets[j]], value: s.presets[j] });
+        c.presets = dOpts(prow.row, pitems, function (v) { setLocal('preset', v); haCall(id, 'preset', v); updateDetail(); });
+      }
+    } else if (d === 'media_player') {
+      c.power = dOpts(body, [{ label: 'Ein', value: 'on' }, { label: 'Aus', value: 'off' }], function (v) { haCall(id, v); }, true);
+      dOpts(body, [{ label: '⏮', value: 'previous' }, { label: '⏯', value: 'playpause' }, { label: '⏭', value: 'next' }],
+        function (v) { haCall(id, v); });
+      c.vol = dSlider(body, 'Lautstärke', 0, 100, 1, function (v) { return v + ' %'; }, function (v) {
+        setLocal('vol', v); haCall(id, 'volume', String(v)); });
+      var favs = [], fi;
+      for (fi = 0; homeCfg.music && fi < homeCfg.music.length; fi++) {
+        if (!homeCfg.music[fi].player || homeCfg.music[fi].player === id) favs.push({ label: '▶︎  ' + homeCfg.music[fi].name, value: homeCfg.music[fi].name });
+      }
+      if (favs.length) {
+        var frow = dRow(body, 'Playlists');
+        dOpts(frow.row, favs, function (v) { haCall(id, 'favorite', v, function (ok) { if (ok) toast('Playlist startet'); }); }, true);
+      }
+      c.mute = dOpts(body, [{ label: 'Stumm', value: 'mute' }], function () {
+        var m = haStates[id] && haStates[id].muted; setLocal('muted', !m); haCall(id, 'mute', m ? '0' : '1'); updateDetail(); }, true);
+    }
+  }
+  function setSlider(o, v) {
+    if (!o || v === undefined || v === null || det.drag) return;
+    o.input.value = v; o.val.textContent = o.fmt(+o.input.value);
+  }
+  function updateDetail() {
+    if (!det) return;
+    var ref = det.ref, d = ref.dom, s = haStates[ref.cfg.entity], c = det.c;
+    if (!s) { c.big.textContent = '–'; c.sub.textContent = 'Keine Daten'; return; }
+    if (s.state === 'unavailable') { c.big.textContent = 'Nicht erreichbar'; c.sub.textContent = ''; return; }
+    if (d === 'light') {
+      c.big.textContent = s.state === 'on' ? (s.bri !== undefined ? s.bri + ' %' : 'An') : 'Aus';
+      c.sub.textContent = s.state === 'on' && s.kelvin ? s.kelvin + ' K' : '';
+      selOpts(c.power, s.state);
+      setSlider(c.bri, s.bri); setSlider(c.kel, s.kelvin);
+    } else if (d === 'cover') {
+      var CS = { open: 'Offen', closed: 'Zu', opening: 'Öffnet …', closing: 'Schließt …' };
+      c.big.textContent = s.pos !== undefined ? s.pos + ' % offen' : (CS[s.state] || s.state);
+      c.sub.textContent = CS[s.state] || s.state;
+      setSlider(c.pos, s.pos);
+    } else if (d === 'climate') {
+      c.big.textContent = s.state === 'off' ? 'Aus' : (s.target !== undefined ? deg(s.target) : '–');
+      c.sub.textContent = (s.cur !== undefined ? 'Aktuell ' + deg(s.cur) : '') +
+        (s.action === 'heating' ? ' · heizt' : s.action === 'cooling' ? ' · kühlt' : s.action === 'idle' ? ' · Ruhe' : '');
+      selOpts(c.modes, s.state); setSlider(c.tgt, s.target);
+    } else if (d === 'fan') {
+      c.big.textContent = s.state === 'on' ? (s.pct !== undefined ? s.pct + ' %' : 'An') : 'Aus';
+      var fx = [];
+      if (s.preset) fx.push('Modus ' + (PRESET[s.preset] || s.preset));
+      if (ref.cfg.filter && numOf(ref.cfg.filter) !== null) fx.push('Filter ' + Math.round(numOf(ref.cfg.filter)) + ' %');
+      if (ref.cfg.pm && numOf(ref.cfg.pm) !== null) fx.push('PM2.5 ' + Math.round(numOf(ref.cfg.pm)) + ' µg/m³');
+      c.sub.textContent = fx.join(' · ');
+      selOpts(c.power, s.state); setSlider(c.pct, s.pct);
+      selOpts(c.presets, s.preset);
+    } else if (d === 'media_player') {
+      var on = s.state !== 'off' && s.state !== 'standby';
+      c.big.textContent = s.state === 'playing' ? 'Spielt' : s.state === 'paused' ? 'Pausiert' : on ? 'Bereit' : 'Aus';
+      c.sub.textContent = s.title ? s.title + (s.artist ? ' · ' + s.artist : '') : '';
+      selOpts(c.power, on ? 'on' : 'off'); setSlider(c.vol, s.vol);
+      selOpts(c.mute, s.muted ? 'mute' : '');
+    }
+  }
+
+  // Wall: after 90 s without touch, close sheets and scroll back to the top.
+  var idleT;
+  function resetIdle() {
+    clearTimeout(idleT);
+    if (!wall) return;
+    idleT = setTimeout(function () { closeDetail(); sheet('briSheet', false); $('rooms').scrollTop = 0; }, 90000);
+  }
+  document.addEventListener('touchstart', resetIdle, true);
+  document.addEventListener('mousedown', resetIdle, true);
+
+  // ---------- wall panels: alerts, appliances, shopping list, Gino, automations ----------
+  var todoLoaded = false;
+  var panels = {}, serverAlerts = null, todoItems = [], showDone = false, todoBusy = false, imgStamp = '';
+  function stateOf(id) { var s = id && haStates[id]; return s ? s.state : undefined; }
+  function numOf(id) { var v = parseFloat(stateOf(id)); return isNaN(v) ? null : v; }
+  // ISO 8601 with offset, parsed by hand (old Safari is unreliable with Date.parse).
+  function parseISO(s) {
+    var m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)(?::(\d\d))?(?:\.\d+)?(Z|([+-])(\d\d):?(\d\d))?$/.exec(s || '');
+    if (!m) return null;
+    var t = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+    if (m[8]) t -= (m[8] === '+' ? 1 : -1) * ((+m[9]) * 60 + (+m[10])) * 60000;
+    else if (!m[7]) t += new Date().getTimezoneOffset() * 60000;
+    return new Date(t);
+  }
+  function hhmm(d) { return two(d.getHours()) + ':' + two(d.getMinutes()); }
+  var cardSeq = 0;
+  function card(title) {
+    var box = el('div', 'room pcard'); box.appendChild(el('h2', null, title)); box.idx = cardSeq++;
+    return box;
+  }
+
+  function buildPanelsTop(rooms) {
+    if (!wall) return;
+    panels = {};
+    if (homeCfg.appliances && homeCfg.appliances.length) {
+      var c = card('Haushalt'), i, a, row;
+      panels.app = [];
+      for (i = 0; i < homeCfg.appliances.length; i++) {
+        a = homeCfg.appliances[i];
+        row = el('div', 'arow');
+        row.appendChild(el('div', 'aic', a.icon || '•'));
+        var mid = el('div', 'amid');
+        mid.appendChild(el('div', 'anm', a.name));
+        var st = el('div', 'ast', ''); mid.appendChild(st);
+        var bar = el('div', 'abar'), barIn = el('div', 'abarin'); bar.appendChild(barIn); mid.appendChild(bar);
+        row.appendChild(mid);
+        c.appendChild(row);
+        panels.app.push({ cfg: a, st: st, bar: bar, barIn: barIn, row: row });
+      }
+      rooms.appendChild(c);
+    }
+  }
+
+  function buildPanelsBottom(rooms) {
+    if (!wall) return;
+    if (homeCfg.todo) {
+      var tc = card(homeCfg.todo.name || 'Einkaufsliste');
+      var add = el('div', 'tadd row');
+      var inp = document.createElement('input'); inp.placeholder = 'Hinzufügen …'; inp.setAttribute('autocorrect', 'on');
+      inp.className = 'grow';
+      var ab = el('div', 'btn pri', '+');
+      add.appendChild(inp); add.appendChild(ab);
+      tc.appendChild(add);
+      var list = el('div', 'tlist'); tc.appendChild(list);
+      var more = el('div', 'tmore', ''); tc.appendChild(more);
+      panels.todo = { list: list, input: inp, more: more };
+      var submit = function () {
+        var v = inp.value.replace(/^\s+|\s+$/g, '');
+        if (!v) return;
+        inp.value = ''; inp.blur();
+        todoItems.unshift({ uid: '', summary: v, done: false }); renderTodo();
+        todoChange('add', v);
+      };
+      tap(ab, submit);
+      inp.addEventListener('keydown', function (e) { if (e.keyCode === 13) { e.preventDefault(); submit(); } }, false);
+      tap(more, function () { showDone = !showDone; renderTodo(); });
+      rooms.appendChild(tc);
+      loadTodo();
+    }
+    if (homeCfg.alerts) {
+      var mc = card('Meldungen');
+      panels.alerts = el('div', 'alerts'); mc.appendChild(panels.alerts);
+      panels.alertsCard = mc; rooms.appendChild(mc);
+    }
+    var g = homeCfg.gino, i;
+    if (g) {
+      var c = card('🐈 ' + (g.name || 'Gino'));
+      var top = el('div', 'grow-row');
+      if (g.image) {
+        var img = el('img', 'gimg'); img.alt = '';
+        tap(img, function () { $('bigImg').src = img.src; sheet('imgSheet', true); });
+        top.appendChild(img);
+        panels.gimg = img;
+      }
+      var info = el('div', 'ginfo');
+      var gst = el('div', 'gst', ''); info.appendChild(gst);
+      var gstats = el('div', 'gstats', ''); info.appendChild(gstats);
+      var gwarn = el('div', 'gwarn', ''); info.appendChild(gwarn);
+      top.appendChild(info);
+      c.appendChild(top);
+      var btns = el('div', 'opts');
+      for (i = 0; i < (g.buttons || []).length; i++) {
+        (function (b) {
+          var o = el('div', 'opt wide', b.name);
+          tap(o, function () { haCall(b.entity, 'press', undefined, function (ok) { if (ok) toast((g.name || 'Gino') + ': ' + b.name); }); });
+          btns.appendChild(o);
+        })(g.buttons[i]);
+      }
+      c.appendChild(btns);
+      panels.gino = { st: gst, stats: gstats, warn: gwarn };
+      rooms.appendChild(c);
+    }
+    if (homeCfg.automations && homeCfg.automations.length) {
+      var ac = card('Automationen');
+      panels.auto = [];
+      for (i = 0; i < homeCfg.automations.length; i++) {
+        (function (a) {
+          var r = el('div', 'autorow row');
+          r.appendChild(el('div', 'grow', a.name));
+          var sw = el('div', 'sw'); sw.appendChild(el('div', 'knob'));
+          r.appendChild(sw);
+          tap(r, function () {
+            var s = haStates[a.entity];
+            if (s) s.state = s.state === 'on' ? 'off' : 'on';
+            renderPanels();
+            haCall(a.entity, 'toggle');
+          });
+          ac.appendChild(r);
+          panels.auto.push({ cfg: a, sw: sw });
+        })(homeCfg.automations[i]);
+      }
+      rooms.appendChild(ac);
+    }
+  }
+
+  var APPST = { inactive: 'Aus', ready: 'Bereit', run: 'Läuft', finished: 'Fertig', pause: 'Pausiert',
+    actionrequired: 'Aktion nötig', delayedstart: 'Startet später', aborting: 'Bricht ab', error: 'Fehler' };
+  var GINOST = { idle: 'Bereit', working: 'Arbeitet', cleaning: 'Reinigt', dumping: 'Entleert', paused: 'Pausiert', error: 'Fehler' };
+
+  function renderPanels() {
+    if (!wall) return;
+    var i, p, s, alerts = [];
+    // appliances
+    for (i = 0; panels.app && i < panels.app.length; i++) {
+      p = panels.app[i]; s = stateOf(p.cfg.state);
+      var txt = s === undefined || s === 'unavailable' ? 'Nicht erreichbar' : (APPST[s] || s);
+      var prog = numOf(p.cfg.progress), fin = parseISO(stateOf(p.cfg.finish));
+      if (s === 'run' && fin) txt += ' · fertig um ' + hhmm(fin);
+      if (s === 'run' && prog !== null) txt += ' · ' + Math.round(prog) + ' %';
+      var door = stateOf(p.cfg.door);
+      if (door === 'open' && s !== 'run') txt += ' · Tür offen';
+      p.st.textContent = txt;
+      p.bar.style.display = s === 'run' && prog !== null ? 'block' : 'none';
+      p.barIn.style.width = (prog || 0) + '%';
+      p.row.className = 'arow' + (s === 'run' ? ' run' : s === 'finished' ? ' fin' : '');
+      if (s === 'finished') alerts.push({ cls: 'ok', text: p.cfg.icon + ' ' + p.cfg.name + ' ist fertig' });
+    }
+    // gino
+    if (panels.gino && homeCfg.gino) {
+      var g = homeCfg.gino, gs = stateOf(g.state), parts = [], warns = [];
+      panels.gino.st.textContent = gs === undefined ? '–' : (GINOST[gs] || gs);
+      if (numOf(g.uses) !== null) parts.push(numOf(g.uses) + '× heute');
+      if (numOf(g.weight) !== null) parts.push('Gewicht ' + String(numOf(g.weight)).replace('.', ',') + ' kg');
+      if (numOf(g.litter) !== null) parts.push('Streu ' + String(numOf(g.litter)).replace('.', ',') + ' kg');
+      panels.gino.stats.textContent = parts.join(' · ');
+      for (i = 0; i < (g.warnings || []).length; i++) {
+        var w = g.warnings[i], v = stateOf(w.entity);
+        if ((w.on && v === w.on) || (w.below !== undefined && numOf(w.entity) !== null && numOf(w.entity) < w.below)) warns.push(w.text);
+      }
+      var err = stateOf(g.error);
+      if (err && err !== 'No error' && err !== 'unavailable' && err !== 'unknown') warns.push(err);
+      panels.gino.warn.textContent = warns.join(' · ');
+      for (i = 0; i < warns.length; i++) alerts.push({ cls: 'warn', text: '🐈 ' + warns[i] });
+      var stamp = stateOf(g.image);
+      if (panels.gimg && stamp && stamp !== imgStamp) {
+        imgStamp = stamp;
+        panels.gimg.src = url('/ha/image', 'entity=' + enc(g.image) + '&t=' + enc(stamp));
+      }
+    }
+    // automations
+    for (i = 0; panels.auto && i < panels.auto.length; i++) {
+      p = panels.auto[i];
+      p.sw.className = 'sw' + (stateOf(p.cfg.entity) === 'on' ? ' on' : '');
+    }
+    // air purifier filters
+    var lim = homeCfg.alerts && homeCfg.alerts.filterBelow, id;
+    if (lim) {
+      for (id in tiles) {
+        if (!tiles.hasOwnProperty(id) || !tiles[id].cfg.filter) continue;
+        var f = numOf(tiles[id].cfg.filter);
+        if (f !== null && f < lim) alerts.push({ cls: 'warn', text: '🌀 Filter ' + (tiles[id].cfg.fullName || tiles[id].cfg.name) + ' ' + Math.round(f) + ' %' });
+      }
+    }
+    // server alerts: batteries, updates
+    if (serverAlerts) {
+      var b = serverAlerts.batteries || [];
+      if (b.length) {
+        var names = [];
+        for (i = 0; i < b.length && i < 3; i++) names.push(b[i].name + ' ' + b[i].level + ' %');
+        alerts.push({ cls: 'warn', text: '🔋 ' + b.length + (b.length === 1 ? ' Batterie' : ' Batterien') + ' schwach: ' + names.join(', ') + (b.length > 3 ? ' …' : '') });
+      }
+      var u = serverAlerts.updates || [];
+      if (u.length) alerts.push({ cls: 'info', text: '⬆️ ' + u.length + (u.length === 1 ? ' Update' : ' Updates') + ' verfügbar' });
+    }
+    if (panels.alerts) {
+      panels.alerts.innerHTML = '';
+      for (i = 0; i < alerts.length; i++) panels.alerts.appendChild(el('div', 'alert ' + alerts[i].cls, alerts[i].text));
+      panels.alerts.style.display = alerts.length ? 'block' : 'none';
+      var wasHidden = panels.alertsCard.style.display === 'none';
+      panels.alertsCard.style.display = alerts.length ? 'block' : 'none';
+      if (wasHidden !== !alerts.length) reflow();
+    }
+    renderPersons();
+  }
+
+  function renderPersons() {
+    var box = $('persons');
+    if (!wall || !homeCfg.persons) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    box.innerHTML = '';
+    for (var i = 0; i < homeCfg.persons.length; i++) {
+      var pc = homeCfg.persons[i], st = stateOf(pc.entity), home = st === 'home';
+      var chip = el('div', 'pchip' + (home ? ' home' : ''));
+      chip.appendChild(el('span', 'pdot'));
+      chip.appendChild(document.createTextNode(pc.name + (st === undefined ? '' : home ? ' · zu Hause' : ' · unterwegs')));
+      box.appendChild(chip);
+    }
+  }
+
+  // shopping list
+  function loadTodo() {
+    if (!homeCfg || !homeCfg.todo || todoBusy) return;
+    todoBusy = true;
+    xhr('GET', url('/ha/todo', 'entity=' + enc(homeCfg.todo.entity)), null, function (s, text) {
+      todoBusy = false;
+      var d = s === 200 && parse(text);
+      if (d && d.items) { var first = !todoLoaded; todoLoaded = true; todoItems = d.items; renderTodo(); if (first) reflow(); }
+    });
+  }
+  function todoChange(action, value) {
+    xhr('POST', url('/ha/todo'), 'entity=' + enc(homeCfg.todo.entity) + '&action=' + action + '&value=' + enc(value), function (s) {
+      if (s !== 200) toast('Einkaufsliste: Änderung fehlgeschlagen');
+      setTimeout(loadTodo, 400);
+    });
+  }
+  function renderTodo() {
+    if (!panels.todo) return;
+    var list = panels.todo.list, i, it, open = 0, done = 0;
+    list.innerHTML = '';
+    for (i = 0; i < todoItems.length; i++) {
+      it = todoItems[i];
+      if (it.done) { done++; if (!showDone) continue; } else open++;
+      (function (item) {
+        var r = el('div', 'titem row' + (item.done ? ' done' : ''));
+        r.appendChild(el('div', 'tcheck', item.done ? '✓' : ''));
+        r.appendChild(el('div', 'grow', item.summary));
+        tap(r, function () {
+          if (!item.uid) return;
+          item.done = !item.done; renderTodo();
+          todoChange(item.done ? 'done' : 'undo', item.uid);
+        });
+        list.appendChild(r);
+      })(it);
+    }
+    if (!open && !showDone) list.appendChild(el('div', 'sub', 'Alles erledigt.'));
+    panels.todo.more.textContent = done ? (showDone ? 'Erledigte ausblenden' : 'Erledigte anzeigen (' + done + ')') : '';
+  }
+  setInterval(function () { if (view === 'home' && wall) loadTodo(); }, 30000);
+
+  // weather forecast
+  var DAYS2 = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  function openForecast() {
+    if (!wall || !homeCfg || !homeCfg.weather) return;
+    $('fcBody').innerHTML = '';
+    $('fcBody').appendChild(el('div', 'sub', 'Lade …'));
+    sheet('fcSheet', true);
+    xhr('GET', url('/ha/forecast', 'entity=' + enc(homeCfg.weather)), null, function (s, text) {
+      var d = s === 200 && parse(text), body = $('fcBody'), i, f, dt, col;
+      body.innerHTML = '';
+      if (!d || !d.days) { body.appendChild(el('div', 'sub', 'Vorhersage nicht verfügbar')); return; }
+      for (i = 0; i < d.days.length; i++) {
+        f = d.days[i]; dt = parseISO(f.date);
+        col = el('div', 'fday');
+        col.appendChild(el('div', 'fdn', i === 0 ? 'Heute' : dt ? DAYS2[dt.getDay()] : ''));
+        col.appendChild(el('div', 'fic', WX[f.cond] || '·'));
+        col.appendChild(el('div', 'fmax', f.max !== undefined ? deg(f.max) : '–'));
+        col.appendChild(el('div', 'fmin', f.min !== undefined ? deg(f.min) : ''));
+        col.appendChild(el('div', 'frain', f.rain ? String(Math.round(f.rain * 10) / 10).replace('.', ',') + ' mm' : ''));
+        body.appendChild(col);
+      }
+      body.appendChild(el('div', 'clear'));
+    });
+  }
+  tap($('conn'), openForecast);
+  tap($('fcClose'), function () { sheet('fcSheet', false); });
+  tap($('imgSheet'), function () { sheet('imgSheet', false); });
+
+  // brightness sheet
+  var briRef = null;
+  (function () {
+    var levels = [0, 10, 25, 50, 75, 100], i, b;
+    for (i = 0; i < levels.length; i++) {
+      b = el('div', 'bri', levels[i] === 0 ? 'Aus' : levels[i] + ' %');
+      (function (lv, node) {
+        tap(node, function () {
+          if (!briRef) return;
+          if (lv === 0) haCall(briRef.cfg.entity, 'off'); else haCall(briRef.cfg.entity, 'brightness', String(lv));
+          sheet('briSheet', false);
+        });
+      })(levels[i], b);
+      $('bris').appendChild(b);
+    }
+  })();
+  function openBri(ref) { briRef = ref; $('briTitle').textContent = 'Helligkeit · ' + (ref.cfg.name || ref.cfg.entity); sheet('briSheet', true); }
+  tap($('briClose'), function () { sheet('briSheet', false); });
+
+  // ---------- boot ----------
+  function connect() {
+    if (!token) { sheet('loginSheet', true); return; }
+    xhr('GET', url('/info'), null, function (s, text) {
+      if (s === 403) { sheet('loginSheet', true); return; }
+      if (s !== 200) { setConn(false); setTimeout(connect, 2000); return; }
+      var d = parse(text);
+      setConn(true);
+      sheet('loginSheet', false);
+      if (d && d.role === 'wall') {
+        wall = true; addClass(document.body, 'wall'); $('mac').textContent = '';
+        homeCfg = null; show('home'); resetIdle();
+        return;
+      }
+      if (d && d.mac) $('mac').textContent = d.mac;
+      loadKeys();
+      show(view);
+    });
+  }
+  tap($('go'), function () {
+    token = $('code').value.replace(/\s/g, '').toLowerCase();
+    $('code').blur();
+    store('token', token); location.hash = 'k=' + token; connect();
+  });
+  document.addEventListener('touchmove', function (e) {
+    // Keep the full-screen app from rubber-banding, but let the lists scroll.
+    var n = e.target;
+    while (n && n !== document.body) { if (n.id === 'rooms' || n.id === 'editList' || n.tagName === 'INPUT' || hasClass(n, 'tlist')) return; n = n.parentNode; }
+    e.preventDefault();
+  }, false);
+  buildKeys(); fit(); tick(); connect();
+})();
+</script>
+</body>
+</html>
