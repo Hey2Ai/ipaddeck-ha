@@ -1,5 +1,5 @@
 name: iPadDeck Wohnzimmer
-version: "1.0.0"
+version: "1.0.1"
 slug: ipaddeck_wall
 description: Kiosk-Dashboard fürs iPad im Wohnzimmer, direkt aus Home Assistant (ohne Mac, ohne Token).
 url: https://github.com/Hey2Ai/ipaddeck-ha
