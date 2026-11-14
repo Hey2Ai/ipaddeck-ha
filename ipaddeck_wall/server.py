@@ -148,7 +148,7 @@ def media_power(entity, action):
     if action == "on":
         if sf & TURN_ON:
             return "media_player/turn_on"
-        if sf & PLAY:
+        if sf & PLAY and on:   # a switched-off TV cannot be woken by "play"
             return "media_player/media_play"
         return None
     if sf & TURN_OFF:
