@@ -128,7 +128,34 @@ def ha(method, path, body=None, raw=False):
 
 
 def error_name(status):
-    return "auth" if status in (401, 403) else "offline"
+    if status in (401, 403):
+        return "auth"
+    if status in (400, 404, 405, 422, 500):
+        return "rejected"
+    return "offline"
+
+
+TURN_ON, TURN_OFF, PAUSE, PLAY = 128, 256, 1, 16384
+
+
+def media_power(entity, action):
+    """Speakers like Sonos have no turn_on/turn_off: map power to play/pause where needed."""
+    status, st = ha("GET", "/states/" + entity)
+    sf = int(num(((st or {}).get("attributes") or {}).get("supported_features")) or 0) if status == 200 else 0
+    on = (st or {}).get("state") not in ("off", "standby", "unavailable", None)
+    if action == "toggle":
+        action = "off" if on else "on"
+    if action == "on":
+        if sf & TURN_ON:
+            return "media_player/turn_on"
+        if sf & PLAY:
+            return "media_player/media_play"
+        return None
+    if sf & TURN_OFF:
+        return "media_player/turn_off"
+    if sf & PAUSE:
+        return "media_player/media_pause"
+    return None
 
 
 def num(v):
@@ -219,9 +246,13 @@ def call(entity, action, value):
         return play_favorite(lay, entity, value or "")
 
     service = None
-    if action == "toggle" and domain in ("light", "switch", "fan", "input_boolean", "media_player", "automation"):
+    if domain == "media_player" and action in ("toggle", "on", "off"):
+        service = media_power(entity, action)
+        if not service:
+            return 400, {"error": "not_supported"}
+    elif action == "toggle" and domain in ("light", "switch", "fan", "input_boolean", "automation"):
         service = domain + "/toggle"
-    elif action in ("on", "off") and domain in ("light", "switch", "fan", "media_player"):
+    elif action in ("on", "off") and domain in ("light", "switch", "fan"):
         service = "%s/turn_%s" % (domain, action)
     elif domain == "light" and action == "brightness":
         v = as_int(1, 100)

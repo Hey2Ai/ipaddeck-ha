@@ -785,6 +785,8 @@
     if (code === 'no_token') return 'Home-Assistant-Token fehlt (~/.ipaddeck/ha.json auf dem Mac)';
     if (code === 'auth') return 'Home Assistant lehnt den Token ab';
     if (code === 'not_allowed') return 'Gerät ist nicht freigegeben';
+    if (code === 'not_supported') return 'Das kann dieses Gerät nicht';
+    if (code === 'rejected') return 'Home Assistant hat den Befehl abgelehnt';
     if (code === 'favorite_missing') return 'Playlist ist in Sonos noch nicht als Favorit gespeichert';
     if (code === 'no_favorites') return 'Sonos-Favoriten nicht verfügbar';
     return 'Home Assistant nicht erreichbar';
